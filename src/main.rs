@@ -1,24 +1,24 @@
 use std::io::{self, Write};
 
-pub fn get_input() -> String {
+pub fn get_input() -> io::Result<String> {
     let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed to read line");
-    input.trim().to_string()
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 pub fn echo(input: &str) -> String {
-    format!("You said: '{}'", input)
+    format!("You said: {:?}", input)
 }
 
-fn main() {
-    // Ask the user for input
+fn main() -> io::Result<()> {
     print!("Enter your input: ");
-    io::stdout().flush().unwrap(); // flush the output buffer
+    io::stdout().flush()?; // flush the output buffer
 
-    let input = get_input();
+    let input = get_input()?;
 
-    // Print the result of echo
     println!("{}", echo(&input));
+
+    Ok(())
 }
 #[cfg(test)]
 mod tests {
@@ -26,10 +26,11 @@ mod tests {
 
     #[test]
     fn test_echo() {
-        assert_eq!(echo("test"), "You said: 'test'");
+        assert_eq!(echo("test"), "You said: \"test\"");
     }
+
     #[test]
     fn test_echo_should_fail() {
-        assert_ne!(echo("test"), "You said: 'mail'");
+        assert_ne!(echo("test"), "You said: \"mail\"");
     }
 }

@@ -1,3 +1,3 @@
 # rust_sandbox
 
-nothing useful here
+The program accepts user input, formats it with static text, and prints to the console.
