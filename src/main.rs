@@ -14,12 +14,14 @@ fn main() -> io::Result<()> {
     print!("Enter your input: ");
     io::stdout().flush()?; // flush the output buffer
 
-    let input = get_input()?;
-
-    println!("{}", echo(&input));
+    match get_input() {
+        Ok(input) => println!("{}", echo(&input)),
+        Err(e) => eprintln!("Failed to read input: {}", e)
+    }
 
     Ok(())
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
