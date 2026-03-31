@@ -10,9 +10,21 @@ pub fn echo(input: &str) -> String {
     format!("You said: {:?}", input)
 }
 
+pub fn penguin_joke() -> (&'static str, &'static str) {
+    (
+        "Why don't penguins like talking to strangers at parties?",
+        "Because they find it hard to break the ice!",
+    )
+}
+
 fn main() -> io::Result<()> {
     print!("Enter your input: ");
     io::stdout().flush()?; // flush the output buffer
+
+    let (setup, punchline) = penguin_joke();
+    println!("{}", setup);
+    println!("{}", punchline);
+    println!();
 
     match get_input() {
         Ok(input) => println!("{}", echo(&input)),
@@ -34,5 +46,13 @@ mod tests {
     #[test]
     fn test_echo_should_fail() {
         assert_ne!(echo("test"), "You said: \"mail\"");
+    }
+
+    #[test]
+    fn test_penguin_joke() {
+        let (setup, punchline) = penguin_joke();
+        assert!(!setup.is_empty());
+        assert!(!punchline.is_empty());
+        assert!(punchline.contains("ice"));
     }
 }
