@@ -1,10 +1,11 @@
 pub mod rpc {
     pub type RpcResult<T, E = RpcError> = Result<Option<T>, E>;
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     pub enum RpcError {
         ConnectionError,
         TimeoutError,
+        #[default]
         DataError,
     }
 }
