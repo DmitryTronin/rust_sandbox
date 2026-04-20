@@ -25,6 +25,29 @@ impl<T, E: Default> MyEnum<T, E> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_flatten_ok_some() {
+        let val: MyEnum<String, rpc::RpcError> = MyEnum::Ok(Ok(Some("hello".to_owned())));
+        assert!(matches!(val.flatten(), Ok(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_flatten_ok_none_returns_default_err() {
+        let val: MyEnum<String, rpc::RpcError> = MyEnum::Ok(Ok(None));
+        assert!(val.flatten().is_err());
+    }
+
+    #[test]
+    fn test_flatten_err_propagates() {
+        let val: MyEnum<String, rpc::RpcError> = MyEnum::Err(rpc::RpcError::ConnectionError);
+        assert!(matches!(val.flatten(), Err(rpc::RpcError::ConnectionError)));
+    }
+}
+
 fn main() {
     let val: MyEnum<String, rpc::RpcError> = MyEnum::Ok(Ok(Some("Hello".to_owned())));
     let result = val.flatten();
