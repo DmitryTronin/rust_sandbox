@@ -440,9 +440,9 @@ const INDEX_HTML: &str = r##"<!doctype html>
 
 fn main() -> io::Result<()> {
     let port = env::var("PORT").unwrap_or_else(|_| "7878".to_owned());
-    let listener = TcpListener::bind(format!("127.0.0.1:{port}"))?;
+    let listener = TcpListener::bind(format!("0.0.0.0:{port}"))?;
 
-    println!("Listening on http://127.0.0.1:{port}");
+    println!("Listening on http://0.0.0.0:{port}");
     println!("POST pasted text to /analyze-clipboard");
 
     for stream in listener.incoming() {
