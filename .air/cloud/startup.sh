@@ -1,82 +1,68 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-project_dir="$(pwd)"
-cargo_env="$HOME/.cargo/env"
+workspace_dir="$(git rev-parse --show-toplevel)"
+target_triple="x86_64-unknown-linux-musl"
+host_triple="$(rustc -vV | sed -n 's/^host: //p')"
+rust_lld="$(rustc --print sysroot)/lib/rustlib/${host_triple}/bin/rust-lld"
 
-install_login_hook() {
-  local profile marker hook
-  marker="# rust_sandbox Cargo environment"
-  hook="[ -f \"$cargo_env\" ] && . \"$cargo_env\" $marker"
+if [ ! -x "$rust_lld" ]; then
+  echo "Rust linker was not found at $rust_lld" >&2
+  exit 1
+fi
 
-  for profile in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
-    if [ -f "$profile" ]; then
-      break
-    fi
-  done
-  if [ ! -f "$profile" ]; then
-    profile="$HOME/.profile"
-    touch "$profile"
+mkdir -p "$HOME/.cargo"
+cat >"$HOME/.cargo/config.toml" <<EOF
+[build]
+target = "${target_triple}"
+
+[target.${target_triple}]
+linker = "${rust_lld}"
+EOF
+
+env_file="$HOME/.air-rust-sandbox-env"
+printf 'export CARGO_BUILD_TARGET=%q\n' "$target_triple" >"$env_file"
+source_line="[ -f '$env_file' ] && . '$env_file' # air-rust-sandbox"
+profile_file=""
+for candidate in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+  if [ -f "$candidate" ]; then
+    profile_file="$candidate"
+    break
   fi
+done
+if [ -z "$profile_file" ]; then
+  profile_file="$HOME/.profile"
+  touch "$profile_file"
+fi
+for shell_file in "$profile_file" "$HOME/.bashrc"; do
+  touch "$shell_file"
+  grep -Fqx "$source_line" "$shell_file" || printf '%s\n' "$source_line" >>"$shell_file"
+done
 
-  for profile in "$profile" "$HOME/.bashrc"; do
-    touch "$profile"
-    if ! grep -Fq "$marker" "$profile"; then
-      printf '\n%s\n%s\n' "$marker" "$hook" >> "$profile"
-    fi
-  done
-}
+echo "Installing the Rust standard library for $target_triple"
+rustup target add "$target_triple"
 
-ensure_rust() {
-  if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
-    echo "Installing the Rust toolchain..."
-    curl --fail --location --proto '=https' --tlsv1.2 --proxy "${HTTPS_PROXY:?HTTPS_PROXY must be set}" https://sh.rustup.rs \
-      | sh -s -- -y --profile minimal
-  fi
-
-  # shellcheck disable=SC1090
-  . "$cargo_env"
-  install_login_hook
-  cargo --version
-}
-
-start_service() {
-  if curl --fail --silent http://127.0.0.1:7878/health >/dev/null 2>&1; then
-    echo "Analyzer service is already running on port 7878."
-    return
-  fi
-
-  echo "Starting the analyzer service on port 7878..."
-  nohup cargo run > /tmp/rust_sandbox-service.log 2>&1 &
-}
+cd "$workspace_dir"
+echo "Fetching and building Rust dependencies"
+cargo fetch
+cargo test --target "$target_triple"
+cargo build --target "$target_triple"
 
 healthcheck() {
-  echo "Waiting for the analyzer service to become ready..."
-  while true; do
-    if curl --fail --silent http://127.0.0.1:7878/health | grep -Fq '"status":"ok"' \
-      && curl --fail --silent http://127.0.0.1:7878/ui | grep -Fq 'Clipboard Hidden Character Analyzer' \
-      && printf 'hello\302\240world\342\200\213' \
-        | curl --fail --silent --request POST http://127.0.0.1:7878/analyze-clipboard --data-binary @- \
-        | grep -Fq '"code_point":"U+00A0"'; then
-      echo "Analyzer service passed healthcheck."
-      return 0
-    fi
-
-    echo "Service is not ready yet; recent log output:"
-    tail -n 20 /tmp/rust_sandbox-service.log 2>/dev/null || true
-    sleep 2
+  echo "Waiting for the analyzer service on port 7878"
+  until curl -fsS -H 'Host: warmup.local' http://127.0.0.1:7878/health | grep -q '"status":"ok"'; do
+    echo "Analyzer service is not ready yet"
+    sleep 1
   done
+
+  echo "Checking analyzer API behavior"
+  curl -fsS -H 'Host: warmup.local' -X POST http://127.0.0.1:7878/analyze-clipboard \
+    --data-binary $'hello\u00a0world\u200b' | grep -q '"invisible_count":2'
+  echo "Analyzer service is ready"
 }
 
-cd "$project_dir"
-ensure_rust
-
-echo "Building and testing rust_sandbox to warm Cargo caches..."
-cargo build
-cargo test
-
-start_service
+echo "Starting the analyzer service"
+nohup "$workspace_dir/target/$target_triple/debug/temp-1" >"/tmp/rust-sandbox.log" 2>&1 &
 
 if [ "${AIR_STARTUP_MODE:-}" = "warmup" ]; then
   healthcheck
