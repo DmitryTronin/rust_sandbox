@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+  echo "Installing the Rust toolchain"
+  curl --fail --location --proto '=https' --tlsv1.2 \
+    --proxy "${HTTPS_PROXY:?HTTPS_PROXY must be set}" https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal
+fi
+export PATH="$HOME/.cargo/bin:$PATH"
+
 workspace_dir="$(git rev-parse --show-toplevel)"
 target_triple="x86_64-unknown-linux-musl"
 host_triple="$(rustc -vV | sed -n 's/^host: //p')"
@@ -21,7 +29,7 @@ linker = "${rust_lld}"
 EOF
 
 env_file="$HOME/.air-rust-sandbox-env"
-printf 'export CARGO_BUILD_TARGET=%q\n' "$target_triple" >"$env_file"
+printf 'export PATH="$HOME/.cargo/bin:$PATH"\nexport CARGO_BUILD_TARGET=%q\n' "$target_triple" >"$env_file"
 source_line="[ -f '$env_file' ] && . '$env_file' # air-rust-sandbox"
 profile_file=""
 for candidate in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
