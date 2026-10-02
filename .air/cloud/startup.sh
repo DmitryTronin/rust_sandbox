@@ -28,6 +28,14 @@ install_login_hook() {
   done
 }
 
+ensure_cc() {
+  if ! command -v cc >/dev/null 2>&1; then
+    echo "Installing a C toolchain (linker required by rustc)..."
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential
+  fi
+}
+
 ensure_rust() {
   if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
     echo "Installing the Rust toolchain..."
@@ -70,6 +78,7 @@ healthcheck() {
 }
 
 cd "$project_dir"
+ensure_cc
 ensure_rust
 
 echo "Building and testing rust_sandbox to warm Cargo caches..."
